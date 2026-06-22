@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時鐘</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #071013;
+            --text: #f8fafc;
+            --muted: rgba(236, 254, 255, 0.62);
+            --panel: rgba(255, 255, 255, 0.14);
+            --panel-line: rgba(255, 255, 255, 0.2);
+            --button-bg: #ffffff;
+            --button-text: #071013;
+            --menu-bg: rgba(7, 16, 19, 0.82);
+            --menu-hover: rgba(255, 255, 255, 0.1);
+            --menu-selected-bg: #ffffff;
+            --menu-selected-text: #071013;
+        }
+
+        body.contrast {
+            color-scheme: light;
+            --bg: #f4f7f8;
+            --text: #071013;
+            --muted: rgba(51, 65, 85, 0.72);
+            --panel: rgba(255, 255, 255, 0.55);
+            --panel-line: rgba(0, 0, 0, 0.15);
+            --button-bg: #071013;
+            --button-text: #ffffff;
+            --menu-bg: rgba(255, 255, 255, 0.88);
+            --menu-hover: rgba(0, 0, 0, 0.08);
+            --menu-selected-bg: #071013;
+            --menu-selected-text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-height: 100%;
+            margin: 0;
+        }
+
+        body {
+            overflow: hidden;
+            user-select: none;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, "Noto Sans TC", system-ui, sans-serif;
+            transition: background 700ms ease, color 700ms ease;
+        }
+
+        .stage {
+            position: relative;
+            display: grid;
+            min-height: 100vh;
+            place-items: center;
+            overflow: hidden;
+            padding: 2rem 1.25rem;
+        }
+
+        .fallback-bg,
+        .grid-bg,
+        #vanta-bg,
+        .lights {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .fallback-bg {
+            background:
+                radial-gradient(circle at 50% 20%, rgba(203, 245, 255, 0.16), transparent 38%),
+                linear-gradient(145deg, #081216 0%, #102126 45%, #071013 100%);
+            transition: opacity 700ms ease;
+        }
+
+        body.contrast .fallback-bg {
+            background:
+                radial-gradient(circle at 50% 20%, rgba(8, 18, 22, 0.12), transparent 38%),
+                linear-gradient(145deg, #f9fbfb 0%, #e7eef0 48%, #ffffff 100%);
+        }
+
+        .grid-bg {
+            opacity: 0.18;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+            background-size: 44px 44px;
+        }
+
+        body.contrast .grid-bg {
+            background-image:
+                linear-gradient(rgba(7, 16, 19, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(7, 16, 19, 0.1) 1px, transparent 1px);
+        }
+
+        #vanta-bg {
+            opacity: 0.85;
+            mix-blend-mode: screen;
+        }
+
+        body.contrast #vanta-bg {
+            mix-blend-mode: multiply;
+        }
+
+        .lights {
+            filter: blur(28px);
+        }
+
+        .light-orb {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
+            border-radius: 48% 52% 58% 42% / 42% 58% 44% 56%;
+            opacity: 0.78;
+            mix-blend-mode: screen;
+            will-change: transform;
+        }
+
+        body.contrast .light-orb {
+            mix-blend-mode: multiply;
+        }
+
+        .shell {
+            position: relative;
+            z-index: 2;
+            width: min(100%, 48rem);
+        }
+
+        .glass-panel {
+            position: relative;
+            min-height: 21rem;
+            overflow: visible;
+            border: 1px solid var(--panel-line);
+            border-radius: 2rem;
+            background: var(--panel);
+            box-shadow: 0 32px 70px rgba(0, 0, 0, 0.35);
+            -webkit-backdrop-filter: blur(28px) saturate(1.35);
+            backdrop-filter: blur(28px) saturate(1.35);
+            padding: 2rem;
+            transition: background 700ms ease, border-color 700ms ease, box-shadow 700ms ease;
+        }
+
+        body.contrast .glass-panel {
+            box-shadow: 0 32px 70px rgba(148, 163, 184, 0.35);
+        }
+
+        .glass-panel::before {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.04) 42%, rgba(255, 255, 255, 0.12));
+            content: "";
+        }
+
+        body.contrast .glass-panel::before {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.22) 42%, rgba(7, 16, 19, 0.06));
+        }
+
+        .glass-panel::after {
+            position: absolute;
+            top: 0;
+            right: 2rem;
+            left: 2rem;
+            height: 1px;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.6);
+            content: "";
+        }
+
+        body.contrast .glass-panel::after {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-content {
+            position: relative;
+            min-height: 17rem;
+            padding-bottom: 5rem;
+        }
+
+        .top-controls {
+            position: absolute;
+            top: 0;
+            right: 0;
+            left: 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+
+        .zone-picker {
+            position: relative;
+            z-index: 4;
+            width: 14rem;
+            max-width: calc(100vw - 10rem);
+        }
+
+        .zone-button,
+        .weather-widget {
+            min-height: 2.75rem;
+            border: 1px solid var(--panel-line);
+            border-radius: 999px;
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.15);
+            -webkit-backdrop-filter: blur(18px);
+            backdrop-filter: blur(18px);
+        }
+
+        body.contrast .zone-button,
+        body.contrast .weather-widget {
+            background: rgba(255, 255, 255, 0.72);
+        }
+
+        .zone-button {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0 1rem;
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.875rem;
+            font-weight: 700;
+            outline: none;
+        }
+
+        .zone-button:focus-visible,
+        .contrast-button:focus-visible {
+            outline: 2px solid currentColor;
+            outline-offset: 3px;
+        }
+
+        .zone-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .zone-chevron {
+            width: 0.48rem;
+            height: 0.48rem;
+            flex: 0 0 auto;
+            border-right: 2px solid currentColor;
+            border-bottom: 2px solid currentColor;
+            opacity: 0.75;
+            transform: rotate(45deg);
+            transition: transform 180ms ease;
+        }
+
+        .zone-button[aria-expanded="true"] .zone-chevron {
+            transform: rotate(225deg);
+        }
+
+        .zone-menu {
+            position: absolute;
+            top: calc(100% + 0.65rem);
+            left: 0;
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid var(--panel-line);
+            border-radius: 1.5rem;
+            background: var(--menu-bg);
+            box-shadow: 0 26px 60px rgba(0, 0, 0, 0.35);
+            -webkit-backdrop-filter: blur(28px) saturate(1.25);
+            backdrop-filter: blur(28px) saturate(1.25);
+            padding: 0.4rem;
+        }
+
+        .zone-option {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            border: 0;
+            border-radius: 1rem;
+            color: inherit;
+            background: transparent;
+            cursor: pointer;
+            padding: 0.65rem 0.75rem;
+            text-align: left;
+        }
+
+        .zone-option:hover {
+            background: var(--menu-hover);
+        }
+
+        .zone-option[aria-selected="true"] {
+            color: var(--menu-selected-text);
+            background: var(--menu-selected-bg);
+        }
+
+        .zone-city,
+        .zone-time {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 700;
+        }
+
+        .zone-country {
+            display: block;
+            margin-top: 0.12rem;
+            color: var(--muted);
+            font-size: 0.75rem;
+        }
+
+        .zone-option[aria-selected="true"] .zone-country {
+            color: currentColor;
+            opacity: 0.72;
+        }
+
+        .weather-widget {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.45rem 0.75rem;
+            text-align: right;
+        }
+
+        .weather-icon {
+            position: relative;
+            display: inline-grid;
+            width: 1.8rem;
+            height: 1.8rem;
+            flex: 0 0 auto;
+            place-items: center;
+        }
+
+        .weather-icon::before,
+        .weather-icon::after {
+            position: absolute;
+            content: "";
+        }
+
+        .weather-cloud::before,
+        .weather-rain::before {
+            width: 1.45rem;
+            height: 0.72rem;
+            border: 2px solid currentColor;
+            border-radius: 9999px;
+            border-top-color: transparent;
+            transform: translateY(0.15rem);
+        }
+
+        .weather-cloud::after,
+        .weather-rain::after {
+            width: 0.72rem;
+            height: 0.72rem;
+            border: 2px solid currentColor;
+            border-bottom: 0;
+            border-radius: 9999px 9999px 0 0;
+            transform: translate(-0.2rem, -0.25rem);
+        }
+
+        .weather-rain {
+            box-shadow:
+                -0.36rem 0.78rem 0 -0.34rem currentColor,
+                0 0.86rem 0 -0.34rem currentColor,
+                0.36rem 0.78rem 0 -0.34rem currentColor;
+        }
+
+        .weather-temperature {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        .weather-meta {
+            display: block;
+            margin-top: 0.2rem;
+            color: var(--muted);
+            font-size: 0.68rem;
+            line-height: 1;
+        }
+
+        .time-wrap {
+            display: grid;
+            min-height: 15rem;
+            place-items: center;
+            padding-top: 3rem;
+        }
+
+        .time {
+            margin: 0;
+            color: var(--text);
+            font-size: clamp(3rem, 12vw, 8rem);
+            font-weight: 950;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0;
+            line-height: 1;
+            text-shadow: 0 8px 34px rgba(34, 211, 238, 0.22);
+        }
+
+        body.contrast .time {
+            text-shadow: 0 8px 34px rgba(7, 16, 19, 0.12);
+        }
+
+        .contrast-button {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            display: grid;
+            width: 3rem;
+            height: 3rem;
+            place-items: center;
+            border: 1px solid var(--panel-line);
+            border-radius: 999px;
+            color: var(--button-text);
+            background: var(--button-bg);
+            box-shadow: 0 18px 34px rgba(0, 0, 0, 0.26);
+            cursor: pointer;
+            transition: transform 300ms ease;
+        }
+
+        .contrast-button:hover {
+            transform: translateY(-0.15rem);
+        }
+
+        .contrast-mark {
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 1px solid currentColor;
+            border-radius: 999px;
+            background: linear-gradient(90deg, currentColor 0 50%, transparent 50% 100%);
+        }
+
+        .date {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            margin: 0;
+            color: var(--muted);
+            font-size: clamp(0.85rem, 2.2vw, 1rem);
+            font-weight: 700;
+            text-align: right;
+        }
+
+        @media (max-width: 640px) {
+            .glass-panel {
+                padding: 1.5rem;
+            }
+
+            .panel-content {
+                min-height: 18rem;
+            }
+
+            .weather-text {
+                display: none;
+            }
+
+            .zone-picker {
+                width: 12.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="stage" id="stage">
+        <div class="fallback-bg"></div>
+        <div class="grid-bg"></div>
+        <div id="vanta-bg"></div>
+        <div class="lights" id="lights"></div>
+
+        <section class="shell" aria-label="世界時鐘">
+            <div class="glass-panel">
+                <div class="panel-content">
+                    <div class="top-controls">
+                        <div class="zone-picker" id="zonePicker">
+                            <button class="zone-button" id="zoneButton" type="button" aria-expanded="false"
+                                aria-haspopup="listbox" aria-label="選擇地區時間">
+                                <span class="zone-label" id="zoneLabel">台北 / Taiwan</span>
+                                <span class="zone-chevron" aria-hidden="true"></span>
+                            </button>
+                            <div class="zone-menu" id="zoneMenu" role="listbox" hidden></div>
+                        </div>
+
+                        <div class="weather-widget" aria-label="天氣">
+                            <span class="weather-icon weather-cloud" aria-hidden="true"></span>
+                            <span class="weather-text">
+                                <span class="weather-temperature">--°</span>
+                                <span class="weather-meta">--°C</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="time-wrap">
+                        <h1 class="time" id="timeText">00:00:00</h1>
+                    </div>
+
+                    <button class="contrast-button" id="contrastButton" type="button" aria-label="切換對比色"
+                        aria-pressed="false">
+                        <span class="contrast-mark" aria-hidden="true"></span>
+                    </button>
+
+                    <p class="date" id="dateText">0000年0月0日星期一</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.net.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script>
+        const zones = [
+            { city: '台北', country: 'Taiwan', zone: 'Asia/Taipei' },
+            { city: '東京', country: 'Japan', zone: 'Asia/Tokyo' },
+            { city: '雪梨', country: 'Australia', zone: 'Australia/Sydney' },
+            { city: '倫敦', country: 'United Kingdom', zone: 'Europe/London' },
+            { city: '巴黎', country: 'France', zone: 'Europe/Paris' },
+            { city: '紐約', country: 'United States', zone: 'America/New_York' },
+            { city: '洛杉磯', country: 'United States', zone: 'America/Los_Angeles' },
+        ];
+
+        const darkLights = [
+            ['340px', 'radial-gradient(circle at 35% 32%, rgba(125,249,255,.95), rgba(45,212,191,.34) 42%, transparent 72%)'],
+            ['420px', 'radial-gradient(circle at 42% 35%, rgba(255,255,255,.92), rgba(129,140,248,.42) 38%, transparent 74%)'],
+            ['300px', 'radial-gradient(circle at 36% 40%, rgba(252,211,77,.82), rgba(251,113,133,.28) 44%, transparent 72%)'],
+            ['260px', 'radial-gradient(circle at 40% 36%, rgba(187,247,208,.86), rgba(34,197,94,.28) 42%, transparent 70%)'],
+            ['220px', 'radial-gradient(circle at 44% 38%, rgba(192,132,252,.78), rgba(168,85,247,.26) 44%, transparent 72%)'],
+            ['280px', 'radial-gradient(circle at 34% 42%, rgba(96,165,250,.82), rgba(14,165,233,.24) 45%, transparent 73%)'],
+            ['190px', 'radial-gradient(circle at 38% 32%, rgba(253,186,116,.82), rgba(249,115,22,.24) 44%, transparent 72%)'],
+            ['240px', 'radial-gradient(circle at 42% 38%, rgba(244,114,182,.74), rgba(236,72,153,.22) 43%, transparent 72%)'],
+        ];
+
+        const lightLights = [
+            ['340px', 'radial-gradient(circle at 35% 32%, rgba(7,16,19,.88), rgba(20,184,166,.24) 42%, transparent 72%)'],
+            ['420px', 'radial-gradient(circle at 42% 35%, rgba(15,23,42,.7), rgba(79,70,229,.24) 38%, transparent 74%)'],
+            ['300px', 'radial-gradient(circle at 36% 40%, rgba(120,53,15,.6), rgba(225,29,72,.2) 44%, transparent 72%)'],
+            ['260px', 'radial-gradient(circle at 40% 36%, rgba(22,101,52,.66), rgba(21,128,61,.18) 42%, transparent 70%)'],
+            ['220px', 'radial-gradient(circle at 44% 38%, rgba(76,29,149,.54), rgba(126,34,206,.16) 44%, transparent 72%)'],
+            ['280px', 'radial-gradient(circle at 34% 42%, rgba(30,64,175,.52), rgba(2,132,199,.16) 45%, transparent 73%)'],
+            ['190px', 'radial-gradient(circle at 38% 32%, rgba(154,52,18,.5), rgba(194,65,12,.16) 44%, transparent 72%)'],
+            ['240px', 'radial-gradient(circle at 42% 38%, rgba(157,23,77,.48), rgba(190,24,93,.14) 43%, transparent 72%)'],
+        ];
+
+        const stage = document.getElementById('stage');
+        const lightsLayer = document.getElementById('lights');
+        const zoneButton = document.getElementById('zoneButton');
+        const zoneLabel = document.getElementById('zoneLabel');
+        const zoneMenu = document.getElementById('zoneMenu');
+        const timeText = document.getElementById('timeText');
+        const dateText = document.getElementById('dateText');
+        const contrastButton = document.getElementById('contrastButton');
+
+        let selectedZone = 'Asia/Taipei';
+        let vantaEffect = null;
+        let lightTweens = [];
+        let pulseReset = null;
+
+        function formatTime(zone) {
+            return new Intl.DateTimeFormat('zh-TW', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+                timeZone: zone,
+            }).format(new Date());
+        }
+
+        function formatDate(zone) {
+            return new Intl.DateTimeFormat('zh-TW', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long',
+                timeZone: zone,
+            }).format(new Date());
+        }
+
+        function currentZone() {
+            return zones.find((item) => item.zone === selectedZone) || zones[0];
+        }
+
+        function updateClock() {
+            timeText.textContent = formatTime(selectedZone);
+            dateText.textContent = formatDate(selectedZone);
+            renderZoneMenu();
+        }
+
+        function renderZoneMenu() {
+            const selected = currentZone();
+            zoneLabel.textContent = `${selected.city} / ${selected.country}`;
+            zoneMenu.innerHTML = zones.map((zone) => {
+                const isSelected = zone.zone === selectedZone;
+                return `
+                    <button class="zone-option" type="button" role="option" aria-selected="${isSelected}" data-zone="${zone.zone}">
+                        <span>
+                            <span class="zone-city">${zone.city}</span>
+                            <span class="zone-country">${zone.country}</span>
+                        </span>
+                        <span class="zone-time">${formatTime(zone.zone)}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function toggleZoneMenu() {
+            const isOpen = zoneButton.getAttribute('aria-expanded') === 'true';
+            zoneButton.setAttribute('aria-expanded', String(!isOpen));
+            zoneMenu.hidden = isOpen;
+        }
+
+        function closeZoneMenu() {
+            zoneButton.setAttribute('aria-expanded', 'false');
+            zoneMenu.hidden = true;
+        }
+
+        zoneButton.addEventListener('click', toggleZoneMenu);
+        zoneMenu.addEventListener('click', (event) => {
+            const option = event.target.closest('.zone-option');
+            if (!option) return;
+            selectedZone = option.dataset.zone;
+            closeZoneMenu();
+            updateClock();
+        });
+
+        document.addEventListener('pointerdown', (event) => {
+            if (event.target.closest('.zone-picker')) return;
+            closeZoneMenu();
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeZoneMenu();
+        });
+
+        function randomBetween(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function createLights() {
+            lightsLayer.innerHTML = '';
+            lightTweens.forEach((tween) => tween && tween.kill && tween.kill());
+            lightTweens = [];
+
+            const palette = document.body.classList.contains('contrast') ? lightLights : darkLights;
+            palette.forEach(([size, background], index) => {
+                const orb = document.createElement('span');
+                orb.className = 'light-orb';
+                orb.style.width = size;
+                orb.style.height = size;
+                orb.style.background = background;
+                lightsLayer.appendChild(orb);
+
+                if (window.gsap) {
+                    gsap.set(orb, {
+                        x: randomBetween(-120, window.innerWidth - 160),
+                        y: randomBetween(-80, window.innerHeight - 120),
+                        transformOrigin: '50% 50%',
+                    });
+                    moveLight(orb, index);
+                }
+            });
+        }
+
+        function moveLight(orb, index) {
+            if (!window.gsap) return;
+
+            const size = parseFloat(orb.style.width) || 280;
+            const targetX = randomBetween(-size * 0.25, window.innerWidth - size * 0.75);
+            const targetY = randomBetween(-size * 0.2, window.innerHeight - size * 0.7);
+            const borderRadius = `${randomBetween(34, 62)}% ${randomBetween(38, 66)}% ${randomBetween(34, 64)}% ${randomBetween(36, 62)}% / ${randomBetween(34, 66)}% ${randomBetween(36, 64)}% ${randomBetween(34, 66)}% ${randomBetween(38, 62)}%`;
+            const tween = gsap.to(orb, {
+                x: targetX,
+                y: targetY,
+                scale: randomBetween(0.72, 1.34),
+                rotate: randomBetween(-28, 28),
+                borderRadius,
+                duration: randomBetween(4.5, 12),
+                ease: 'sine.inOut',
+                onComplete: () => moveLight(orb, index),
+            });
+
+            lightTweens[index] = tween;
+        }
+
+        stage.addEventListener('pointermove', (event) => {
+            if (!window.gsap) return;
+            document.querySelectorAll('.light-orb').forEach((orb) => {
+                const rect = orb.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const dx = centerX - event.clientX;
+                const dy = centerY - event.clientY;
+                const distance = Math.hypot(dx, dy);
+                const safeDistance = Math.max(rect.width * 0.55, 190);
+
+                if (distance < safeDistance) {
+                    const force = (safeDistance - Math.max(distance, 1)) / safeDistance;
+                    gsap.to(orb, {
+                        x: `+=${(dx / Math.max(distance, 1)) * force * 130}`,
+                        y: `+=${(dy / Math.max(distance, 1)) * force * 130}`,
+                        scale: 0.82 + force * 0.3,
+                        duration: 0.75,
+                        overwrite: false,
+                        ease: 'power3.out',
+                    });
+                }
+            });
+        });
+
+        function initVanta() {
+            if (!window.VANTA || !window.THREE) return;
+            if (vantaEffect) vantaEffect.destroy();
+            vantaEffect = VANTA.NET({
+                THREE: window.THREE,
+                el: '#vanta-bg',
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200,
+                minWidth: 200,
+                scale: 1,
+                scaleMobile: 1,
+                backgroundAlpha: 0,
+                color: 0x333333,
+                speed: 1,
+                points: 13,
+                maxDistance: 23,
+                spacing: 18,
+                showDots: true,
+            });
+        }
+
+        function pulseBackground() {
+            if (vantaEffect && vantaEffect.setOptions) {
+                vantaEffect.setOptions({ speed: 3.2 });
+            }
+            lightTweens.forEach((tween) => tween && tween.timeScale && tween.timeScale(2.6));
+
+            clearTimeout(pulseReset);
+            pulseReset = setTimeout(() => {
+                if (vantaEffect && vantaEffect.setOptions) {
+                    vantaEffect.setOptions({ speed: 1 });
+                }
+                lightTweens.forEach((tween) => tween && tween.timeScale && tween.timeScale(1));
+            }, 2600);
+        }
+
+        contrastButton.addEventListener('click', () => {
+            document.body.classList.toggle('contrast');
+            contrastButton.setAttribute('aria-pressed', String(document.body.classList.contains('contrast')));
+            createLights();
+            initVanta();
+        });
+
+        renderZoneMenu();
+        updateClock();
+        createLights();
+        initVanta();
+        setInterval(updateClock, 1000);
+        setInterval(pulseBackground, 10000);
+        window.addEventListener('resize', () => {
+            if (vantaEffect && vantaEffect.resize) vantaEffect.resize();
+        });
+    </script>
+</body>
+
+</html>
